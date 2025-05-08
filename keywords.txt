@@ -1,0 +1,28 @@
+# Syntax Coloring Map For EventStateMachine
+
+# Datatypes (KEYWORD1)
+EventStateMachine	KEYWORD1
+StateCallback	KEYWORD1
+StateFunction	KEYWORD1
+GlobalStateCallback	KEYWORD1
+
+# Methods and Functions (KEYWORD2)
+configureState	KEYWORD2
+addTimeout	KEYWORD2
+addOnEnter	KEYWORD2
+addOnState	KEYWORD2
+addOnExit	KEYWORD2
+removeTimeout	KEYWORD2
+removeOnEnter	KEYWORD2
+removeOnState	KEYWORD2
+removeOnExit	KEYWORD2
+addBeforeStateChangeHandler	KEYWORD2
+addAfterStateChangeHandler	KEYWORD2
+removeBeforeStateChangeHandler	KEYWORD2
+removeAfterStateChangeHandler	KEYWORD2
+setState	KEYWORD2
+update	KEYWORD2
+getCurrentState	KEYWORD2
+getPreviousState	KEYWORD2
+isStateChanged	KEYWORD2
+timeInCurrentState	KEYWORD2
