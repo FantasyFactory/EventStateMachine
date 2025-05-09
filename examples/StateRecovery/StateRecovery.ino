@@ -8,12 +8,45 @@
   The circuit:
   - Built-in LED on pin LED_BUILTIN
 
+  This example works on:
+  - Arduino boards (using SD library, requires SD card)
+  - ESP8266/ESP32 (using LittleFS)
+  - Raspberry Pi Pico (RP2040) (using LittleFS)
+
   created May 8, 2025
   by Corrado Casoni
 */
 
 #include <EventStateMachine.h>
-#include <LittleFS.h>
+
+// Inclusioni e definizioni specifiche per piattaforma
+#if defined(ESP8266) || defined(ESP32)
+  #include <LittleFS.h>
+  #define STORAGE_BEGIN() LittleFS.begin()
+  #define STORAGE_EXISTS(filename) LittleFS.exists(filename)
+  #define STORAGE_OPEN(filename, mode) LittleFS.open(filename, mode)
+  #define STORAGE_REMOVE(filename) LittleFS.remove(filename)
+  #define STORAGE_NAME "LittleFS"
+#elif defined(ARDUINO_ARCH_RP2040)
+  #include <LittleFS.h>
+  #define STORAGE_BEGIN() LittleFS.begin()
+  #define STORAGE_EXISTS(filename) LittleFS.exists(filename)
+  #define STORAGE_OPEN(filename, mode) LittleFS.open(filename, mode)
+  #define STORAGE_REMOVE(filename) LittleFS.remove(filename)
+  #define STORAGE_NAME "LittleFS"
+#else
+  // Per Arduino standard, usare SD (richiede una scheda SD)
+  #include <SD.h>
+  const int chipSelect = 4;  // Impostare il pin CS corretto per la propria scheda
+  #define STORAGE_BEGIN() SD.begin(chipSelect)
+  #define STORAGE_EXISTS(filename) SD.exists(filename)
+  #define STORAGE_OPEN(filename, mode) SD.open(filename, mode)
+  #define STORAGE_REMOVE(filename) SD.remove(filename)
+  #define STORAGE_NAME "SD Card"
+#endif
+
+// Nome del file di log degli stati
+#define STATE_LOG_FILENAME "/state_log.txt"
 
 // Define states
 enum States {
@@ -43,7 +76,7 @@ void saveStateTransition(uint8_t fromState, uint8_t toState) {
   Serial.println(STATE_NAMES[toState]);
   
   // Open log file in append mode
-  File stateLog = LittleFS.open("/state_log.txt", "a");
+  File stateLog = STORAGE_OPEN(STATE_LOG_FILENAME, "a");
   if (stateLog) {
     // Write timestamp and state info
     stateLog.print(millis());
@@ -80,8 +113,8 @@ void duringRunning(uint8_t state) {
 
 // Function to recover last state from flash
 bool recoverLastStateFromFlash(uint8_t& lastState) {
-  if (LittleFS.exists("/state_log.txt")) {
-    File stateLog = LittleFS.open("/state_log.txt", "r");
+  if (STORAGE_EXISTS(STATE_LOG_FILENAME)) {
+    File stateLog = STORAGE_OPEN(STATE_LOG_FILENAME, "r");
     if (stateLog) {
       // Read the last saved state
       String lastLine;
@@ -112,10 +145,13 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   
   // Initialize filesystem
-  if (!LittleFS.begin()) {
-    Serial.println("Error mounting LittleFS!");
+  if (!STORAGE_BEGIN()) {
+    Serial.print("Error mounting ");
+    Serial.print(STORAGE_NAME);
+    Serial.println("!");
   } else {
-    Serial.println("LittleFS mounted successfully");
+    Serial.print(STORAGE_NAME);
+    Serial.println(" mounted successfully");
   }
   
   Serial.println("EventStateMachine State Recovery Example");
@@ -173,7 +209,7 @@ void loop() {
                 break;
             case 'c':
                 Serial.println("Command: Clear state log");
-                if (LittleFS.remove("/state_log.txt")) {
+                if (STORAGE_REMOVE(STATE_LOG_FILENAME)) {
                     Serial.println("State log cleared");
                 } else {
                     Serial.println("Error clearing state log");
@@ -181,8 +217,8 @@ void loop() {
                 break;
             case 'l':
                 Serial.println("Command: List state transitions");
-                if (LittleFS.exists("/state_log.txt")) {
-                    File stateLog = LittleFS.open("/state_log.txt", "r");
+                if (STORAGE_EXISTS(STATE_LOG_FILENAME)) {
+                    File stateLog = STORAGE_OPEN(STATE_LOG_FILENAME, "r");
                     if (stateLog) {
                     Serial.println("\n--- State Transition Log ---");
                     Serial.println("Timestamp,FromState,ToState");

@@ -1,26 +1,57 @@
 # EventStateMachine
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Arduino Library](https://img.shields.io/badge/Arduino-Library-blue.svg)](https://www.arduino.cc/reference/en/libraries/)
 
-A flexible and powerful event-driven State Machine library for ESP8266 and ESP32.
+A flexible and powerful event-driven State Machine library for Arduino, ESP8266/ESP32, and RP2040 (Raspberry Pi Pico).
 
 *Read this in [Italian](README_IT.md)*
 
 ## Features
 
+- **Cross-platform compatibility**: works on Arduino boards, ESP8266/ESP32, and RP2040 (Raspberry Pi Pico)
 - **Advanced event handling**: multiple callbacks for each state event (enter, exit, during)
 - **Configurable timeouts**: set multiple timeouts per state with specific callbacks
 - **Global transition handlers**: customizable hooks before and after state changes
-- **Easy integration with persistent storage**: example of saving and recovering state from flash memory
+- **Easy integration with persistent storage**: examples of saving and recovering state (using LittleFS on ESP/RP2040 or SD on Arduino)
 - **Robust error handling**: verification of state validity and callbacks
-- **Fully C++ based**: uses modern features like vectors and functionals
+- **Platform-optimized implementation**: uses native features where available, with fallbacks for simpler platforms
 
 ## Requirements
 
-- ESP8266 or ESP32 board
+- Arduino, ESP8266/ESP32, or RP2040 (Raspberry Pi Pico) board
 - Arduino IDE 1.8.0 or higher
-- (Optional) LittleFS for the state persistence example
+- For the StateRecovery example:
+  - ESP8266/ESP32 or RP2040: LittleFS
+  - Arduino boards: SD card library and SD card
+## Platform-Specific Considerations
 
+### ESP8266/ESP32
+
+On ESP platforms, the library uses:
+- **Ticker** library for timing functions (hardware timers)
+- **STL containers** (std::vector) for callback storage
+- **LittleFS** for state persistence in the examples
+
+### RP2040 (Raspberry Pi Pico)
+
+On RP2040, the library uses:
+- **Custom timer implementation** based on millis()
+- **STL containers** (std::vector) for callback storage (well supported on RP2040)
+- **LittleFS** for state persistence in the examples
+
+### Arduino Boards (AVR, SAMD, etc.)
+
+On standard Arduino boards, the library uses:
+- **Custom timer implementation** based on millis()
+- **SimpleArray** as an alternative to std::vector for callback storage (limited STL support)
+- **SD card** for state persistence in the examples
+
+### Memory Usage
+
+Memory usage varies by platform:
+- ESP8266/ESP32 and RP2040: Using STL containers requires more memory but provides greater flexibility
+- Arduino boards: Using SimpleArray with fixed capacity is more memory efficient but has limited capacity
 ## Installation
 
 ### Via Arduino IDE Library Manager (Recommended)
@@ -192,7 +223,7 @@ The library includes three complete examples:
 
 ### BasicStateMachine
 
-Demonstrates basic state machine usage with three states and essential callbacks. Controls the built-in LED based on state and responds to serial commands.
+Demonstrates basic state machine usage with three states and essential callbacks. Controls the built-in LED based on state and responds to serial commands. Works on all supported platforms with identical code.
 
 ### MultipleCallbacks
 
@@ -204,29 +235,46 @@ Illustrates how to use multiple callbacks for each type of state event. Includes
 
 ### StateRecovery
 
-Shows how to implement state persistence using LittleFS. Allows you to:
+Shows how to implement state persistence. Allows you to:
 - Save each state transition to a log file
 - Recover the last saved state after a restart
 - View the history of transitions
+
+This example demonstrates platform-specific storage implementation:
+- On ESP8266/ESP32 and RP2040: uses LittleFS
+- On Arduino boards: uses SD card library (requires an SD card connected to the board)
 
 ## Design Considerations
 
 ### Performance
 
-The library uses C++ vectors to manage multiple callbacks, which offers flexibility but requires a certain amount of memory. On devices with very limited memory, consider using only the necessary callbacks.
+On ESP8266/ESP32 and RP2040, the library uses C++ vectors to manage multiple callbacks, which offers flexibility but requires more memory. On Arduino boards with limited memory, a simple fixed-capacity array is used instead.
+
+For optimal performance on memory-limited devices, consider:
+- Using only the necessary callbacks
+- Limiting the number of states and callbacks per state
+- Avoiding complex operations in callbacks
 
 ### Synchronization
 
-Timeouts are managed using the Ticker library, which works asynchronously. This means that timeout callbacks can be executed at any time, even during other operations.
+On ESP8266/ESP32, timeouts are managed using the Ticker library, which works asynchronously. On other platforms, timeouts are checked during the `update()` call using millis()-based timing.
+
+This means:
+- On ESP platforms: timeout callbacks can be executed at any time (asynchronously)
+- On other platforms: timeout callbacks are only executed during your `update()` call (synchronously)
 
 ## Troubleshooting
 
 ### Timeouts not firing
 
 - Verify that `update()` is called regularly in the loop
-- Check that there are no long delay() calls blocking execution
+- Check that there are no long delay() calls blocking execution (especially important on non-ESP platforms)
 - Make sure the timeout callback is not null
+### Platform-specific issues
 
+- **Arduino (AVR/SAMD)**: If you exceed the maximum number of callbacks (default: 8 per type), they will be silently ignored. Consider increasing the SimpleArray template parameter if needed.
+- **ESP8266/ESP32**: Ensure you don't run out of heap memory when using many vectors of callbacks.
+- **RP2040**: Timing precision may be slightly different from ESP platforms due to the millis()-based implementation.
 ### Callbacks not executed
 
 - Ensure the state is valid (< numStates)

@@ -8,6 +8,11 @@
   The circuit:
   - Built-in LED on pin LED_BUILTIN
 
+  This example works on:
+  - Arduino boards
+  - ESP8266/ESP32
+  - Raspberry Pi Pico (RP2040)
+
   created May 8, 2025
   by Corrado Casoni
 */

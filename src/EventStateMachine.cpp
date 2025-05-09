@@ -1,11 +1,9 @@
 /*
-  EventStateMachine.cpp - Event-driven State Machine library for Arduino ESP8266/ESP32
+  EventStateMachine.cpp - Event-driven State Machine library for Arduino, ESP8266/ESP32, and RP2040
   Created by Corrado Casoni (corrado.casoni@gmail.com), May 8, 2025.
   Released under MIT License.
 */
 #include "EventStateMachine.h"
-
-#if defined(ESP8266) || defined(ESP32)
 
 // Inizializzazione della variabile statica
 EventStateMachine* EventStateMachine::instance = nullptr;
@@ -27,7 +25,9 @@ void EventStateMachine::onTimeout(uint8_t state, uint8_t timeoutIndex) {
       Serial.println(timeoutIndex);
     }
     
-    states[state].timeouts[timeoutIndex].callback(currentState, previousState);
+    auto& timeoutInfo = states[state].timeouts[timeoutIndex];
+    timeoutInfo.active = false;
+    timeoutInfo.callback(currentState, previousState);
   }
 }
 
@@ -49,10 +49,11 @@ EventStateMachine::EventStateMachine(uint8_t numberOfStates) {
 }
 
 EventStateMachine::~EventStateMachine() {
-  // Ferma tutti i Ticker
+  // Ferma tutti i timer
   for (uint8_t s = 0; s < numStates; s++) {
     for (auto& timeoutInfo : states[s].timeouts) {
-      timeoutInfo.ticker.detach();
+      timeoutInfo.timer.detach();
+      timeoutInfo.active = false;
     }
   }
   
@@ -91,6 +92,12 @@ bool EventStateMachine::addTimeout(uint8_t state, unsigned long timeout, StateCa
   TimeoutInfo timeoutInfo;
   timeoutInfo.duration = timeout;
   timeoutInfo.callback = onTimeout;
+  timeoutInfo.active = false;
+  
+#if !defined(ESP8266) && !defined(ESP32)
+  timeoutInfo.stateIndex = state;
+  timeoutInfo.timeoutIndex = states[state].timeouts.size();
+#endif
   
   states[state].timeouts.push_back(timeoutInfo);
   return true;
@@ -121,10 +128,17 @@ bool EventStateMachine::removeTimeout(uint8_t state, unsigned long timeout) {
   if (!isValidState(state)) return false;
   
   auto& timeouts = states[state].timeouts;
-  for (auto it = timeouts.begin(); it != timeouts.end(); ++it) {
-    if (it->duration == timeout) {
-      it->ticker.detach(); // Assicurati di fermare il ticker
-      timeouts.erase(it);
+  for (size_t i = 0; i < timeouts.size(); i++) {
+    if (timeouts[i].duration == timeout) {
+      timeouts[i].timer.detach(); // Assicurati di fermare il timer
+      timeouts[i].active = false;
+      
+#if defined(ESP8266) || defined(ESP32) || defined(ARDUINO_ARCH_RP2040)
+      timeouts.erase(timeouts.begin() + i);
+#else
+      // Per Arduino, usa SimpleArray::erase
+      timeouts.erase(&timeouts[i]);
+#endif
       return true;
     }
   }
@@ -135,9 +149,14 @@ bool EventStateMachine::removeOnEnter(uint8_t state, StateCallback onEnter) {
   if (!isValidState(state)) return false;
   
   auto& callbacks = states[state].onEnters;
-  for (auto it = callbacks.begin(); it != callbacks.end(); ++it) {
-    if (*it == onEnter) {
-      callbacks.erase(it);
+  for (size_t i = 0; i < callbacks.size(); i++) {
+    if (callbacks[i] == onEnter) {
+#if defined(ESP8266) || defined(ESP32) || defined(ARDUINO_ARCH_RP2040)
+      callbacks.erase(callbacks.begin() + i);
+#else
+      // Per Arduino, usa SimpleArray::erase
+      callbacks.erase(&callbacks[i]);
+#endif
       return true;
     }
   }
@@ -148,9 +167,14 @@ bool EventStateMachine::removeOnState(uint8_t state, StateFunction onState) {
   if (!isValidState(state)) return false;
   
   auto& callbacks = states[state].onStates;
-  for (auto it = callbacks.begin(); it != callbacks.end(); ++it) {
-    if (*it == onState) {
-      callbacks.erase(it);
+  for (size_t i = 0; i < callbacks.size(); i++) {
+    if (callbacks[i] == onState) {
+#if defined(ESP8266) || defined(ESP32) || defined(ARDUINO_ARCH_RP2040)
+      callbacks.erase(callbacks.begin() + i);
+#else
+      // Per Arduino, usa SimpleArray::erase
+      callbacks.erase(&callbacks[i]);
+#endif
       return true;
     }
   }
@@ -161,9 +185,14 @@ bool EventStateMachine::removeOnExit(uint8_t state, StateCallback onExit) {
   if (!isValidState(state)) return false;
   
   auto& callbacks = states[state].onExits;
-  for (auto it = callbacks.begin(); it != callbacks.end(); ++it) {
-    if (*it == onExit) {
-      callbacks.erase(it);
+  for (size_t i = 0; i < callbacks.size(); i++) {
+    if (callbacks[i] == onExit) {
+#if defined(ESP8266) || defined(ESP32) || defined(ARDUINO_ARCH_RP2040)
+      callbacks.erase(callbacks.begin() + i);
+#else
+      // Per Arduino, usa SimpleArray::erase
+      callbacks.erase(&callbacks[i]);
+#endif
       return true;
     }
   }
@@ -183,9 +212,14 @@ void EventStateMachine::addAfterStateChangeHandler(GlobalStateCallback handler) 
 }
 
 bool EventStateMachine::removeBeforeStateChangeHandler(GlobalStateCallback handler) {
-  for (auto it = beforeStateChangeHandlers.begin(); it != beforeStateChangeHandlers.end(); ++it) {
-    if (*it == handler) {
-      beforeStateChangeHandlers.erase(it);
+  for (size_t i = 0; i < beforeStateChangeHandlers.size(); i++) {
+    if (beforeStateChangeHandlers[i] == handler) {
+#if defined(ESP8266) || defined(ESP32) || defined(ARDUINO_ARCH_RP2040)
+      beforeStateChangeHandlers.erase(beforeStateChangeHandlers.begin() + i);
+#else
+      // Per Arduino, usa SimpleArray::erase
+      beforeStateChangeHandlers.erase(&beforeStateChangeHandlers[i]);
+#endif
       return true;
     }
   }
@@ -193,9 +227,14 @@ bool EventStateMachine::removeBeforeStateChangeHandler(GlobalStateCallback handl
 }
 
 bool EventStateMachine::removeAfterStateChangeHandler(GlobalStateCallback handler) {
-  for (auto it = afterStateChangeHandlers.begin(); it != afterStateChangeHandlers.end(); ++it) {
-    if (*it == handler) {
-      afterStateChangeHandlers.erase(it);
+  for (size_t i = 0; i < afterStateChangeHandlers.size(); i++) {
+    if (afterStateChangeHandlers[i] == handler) {
+#if defined(ESP8266) || defined(ESP32) || defined(ARDUINO_ARCH_RP2040)
+      afterStateChangeHandlers.erase(afterStateChangeHandlers.begin() + i);
+#else
+      // Per Arduino, usa SimpleArray::erase
+      afterStateChangeHandlers.erase(&afterStateChangeHandlers[i]);
+#endif
       return true;
     }
   }
@@ -209,18 +248,19 @@ void EventStateMachine::setState(uint8_t newState) {
   if (newState == currentState) return;
   
   // Esegui tutti gli handler globali prima del cambio di stato
-  for (const auto& handler : beforeStateChangeHandlers) {
-    handler(currentState, newState);
+  for (size_t i = 0; i < beforeStateChangeHandlers.size(); i++) {
+    beforeStateChangeHandlers[i](currentState, newState);
   }
   
-  // Ferma tutti i ticker attivi dello stato corrente
+  // Ferma tutti i timer attivi dello stato corrente
   for (auto& timeoutInfo : states[currentState].timeouts) {
-    timeoutInfo.ticker.detach();
+    timeoutInfo.timer.detach();
+    timeoutInfo.active = false;
   }
   
   // Esegui tutti i callback di uscita
-  for (const auto& onExit : states[currentState].onExits) {
-    onExit(currentState, newState);
+  for (size_t i = 0; i < states[currentState].onExits.size(); i++) {
+    states[currentState].onExits[i](currentState, newState);
   }
   
   previousState = currentState;
@@ -229,16 +269,19 @@ void EventStateMachine::setState(uint8_t newState) {
   stateChanged = true;
   
   // Esegui tutti i callback di entrata
-  for (const auto& onEnter : states[currentState].onEnters) {
-    onEnter(currentState, previousState);
+  for (size_t i = 0; i < states[currentState].onEnters.size(); i++) {
+    states[currentState].onEnters[i](currentState, previousState);
   }
   
   // Imposta i nuovi timeout
+#if defined(ESP8266) || defined(ESP32)
+  // Implementazione per ESP con Ticker
   for (size_t i = 0; i < states[currentState].timeouts.size(); i++) {
     auto& timeoutInfo = states[currentState].timeouts[i];
+    timeoutInfo.active = true;
     
     // Usa la funzione statica come callback, passando stato e indice
-    timeoutInfo.ticker.once_ms(timeoutInfo.duration, 
+    timeoutInfo.timer.once_ms(timeoutInfo.duration, 
       [state = currentState, index = i]() {
         EventStateMachine::onTimeoutStatic(state, index);
       }
@@ -254,17 +297,48 @@ void EventStateMachine::setState(uint8_t newState) {
       Serial.println(" ms");
     }
   }
+#else
+  // Implementazione per Arduino/RP2040 basata su millis()
+  for (size_t i = 0; i < states[currentState].timeouts.size(); i++) {
+    auto& timeoutInfo = states[currentState].timeouts[i];
+    timeoutInfo.stateIndex = currentState;
+    timeoutInfo.timeoutIndex = i;
+    timeoutInfo.active = true;
+    timeoutInfo.timer.once_ms(timeoutInfo.duration, nullptr);
+    
+    if (debugEnabled) {
+      Serial.print("DEBUG: Timeout set for state ");
+      Serial.print(currentState);
+      Serial.print(", index ");
+      Serial.print(i);
+      Serial.print(", duration ");
+      Serial.print(timeoutInfo.duration);
+      Serial.println(" ms");
+    }
+  }
+#endif
   
   // Esegui tutti gli handler globali dopo il cambio di stato
-  for (const auto& handler : afterStateChangeHandlers) {
-    handler(previousState, currentState);
+  for (size_t i = 0; i < afterStateChangeHandlers.size(); i++) {
+    afterStateChangeHandlers[i](previousState, currentState);
   }
 }
 
 void EventStateMachine::update() {
+#if !defined(ESP8266) && !defined(ESP32)
+  // Per piattaforme non-ESP, controlla e aggiorna i timer attivi
+  for (size_t i = 0; i < states[currentState].timeouts.size(); i++) {
+    TimeoutInfo& timeoutInfo = states[currentState].timeouts[i];
+    if (timeoutInfo.active && timeoutInfo.timer.update()) {
+      // Timer scaduto, chiama il callback
+      onTimeout(currentState, i);
+    }
+  }
+#endif
+  
   // Esegui tutte le funzioni di stato
-  for (const auto& onState : states[currentState].onStates) {
-    onState(currentState);
+  for (size_t i = 0; i < states[currentState].onStates.size(); i++) {
+    states[currentState].onStates[i](currentState);
   }
   
   stateChanged = false;
@@ -285,5 +359,3 @@ bool EventStateMachine::isStateChanged() const {
 unsigned long EventStateMachine::timeInCurrentState() const {
   return millis() - stateEnteredTime;
 }
-
-#endif // defined(ESP8266) || defined(ESP32)
