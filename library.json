@@ -1,0 +1,39 @@
+{
+  "name": "EventStateMachine",
+  "version": "1.0.0",
+  "description": "A flexible and powerful event-driven State Machine library for ESP8266 and ESP32",
+  "keywords": "state machine, event-driven, esp8266, esp32",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FantasyFactory/EventStateMachine.git"
+  },
+  "authors": {
+    "name": "Corrado Casoni",
+    "email": "corrado.casoni@gmail.com",
+    "url": "https://github.com/FantasyFactory"
+  },
+  "license": "MIT",
+  "frameworks": "arduino",
+  "platforms": ["espressif8266", "espressif32"],
+  "dependencies": {
+    "Ticker": "*"
+  },
+  "headers": "EventStateMachine.h",
+  "examples": [
+    {
+      "name": "BasicStateMachine",
+      "base": "examples/BasicStateMachine",
+      "files": ["BasicStateMachine.ino"]
+    },
+    {
+      "name": "MultipleCallbacks",
+      "base": "examples/MultipleCallbacks",
+      "files": ["MultipleCallbacks.ino"]
+    },
+    {
+      "name": "StateRecovery",
+      "base": "examples/StateRecovery",
+      "files": ["StateRecovery.ino"]
+    }
+  ]
+}
